@@ -1,0 +1,16 @@
+{
+  "name": "jobrunner",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -n backend,dashboard -c blue,green \"npm run dev -w backend\" \"npm run dev -w dashboard\"",
+    "install:all": "npm install -w backend && npm install -w dashboard"
+  },
+  "workspaces": [
+    "backend",
+    "dashboard"
+  ],
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
