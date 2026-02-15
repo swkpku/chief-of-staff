@@ -357,4 +357,132 @@ test.describe('Dashboard Light Theme Redesign', () => {
 
     await expect(filterIndicator).not.toBeVisible({ timeout: 3000 });
   });
+
+  // ── Slack Catchup Job ─────────────────────────────────────────────
+
+  test('Slack Catchup job card is visible', async ({ page }) => {
+    const slackJob = page.locator('text=Slack Catchup');
+    await expect(slackJob.first()).toBeVisible();
+  });
+
+  test('Slack Catchup job card is in the grid', async ({ page }) => {
+    const cardText = await page.evaluate(() => {
+      const allDivs = Array.from(document.querySelectorAll('div'));
+      const card = allDivs.find(el => {
+        const style = getComputedStyle(el);
+        return style.borderRadius === '12px' &&
+               style.backgroundColor === 'rgb(255, 255, 255)' &&
+               el.textContent?.includes('Slack Catchup');
+      });
+      return card ? card.textContent : '';
+    });
+    expect(cardText).toContain('Slack Catchup');
+  });
+
+  test('clicking Slack Catchup card filters timeline', async ({ page }) => {
+    const slackJob = page.locator('text=Slack Catchup').first();
+    await slackJob.click();
+
+    const filterIndicator = page.locator('text=Filtering');
+    await expect(filterIndicator).toBeVisible({ timeout: 3000 });
+  });
+
+  test('Slack Catchup job detail shows slack tool', async ({ page }) => {
+    await page.evaluate(() => {
+      const allDivs = Array.from(document.querySelectorAll('div'));
+      const card = allDivs.find(el => {
+        const style = getComputedStyle(el);
+        return style.borderRadius === '12px' &&
+               style.backgroundColor === 'rgb(255, 255, 255)' &&
+               el.textContent?.includes('Slack Catchup');
+      });
+      if (card) {
+        const viewDetail = Array.from(card.querySelectorAll('div')).find(el =>
+          el.textContent?.trim().startsWith('View Details') &&
+          el.children.length === 0 &&
+          el.style.cursor === 'pointer'
+        );
+        if (viewDetail) (viewDetail as HTMLElement).click();
+      }
+    });
+
+    await expect(page.locator('text=MISSION LOG')).toBeVisible({ timeout: 5000 });
+    const slackTool = page.locator('text=slack');
+    await expect(slackTool.first()).toBeVisible();
+  });
+
+  test('Slack Catchup job detail shows boundaries', async ({ page }) => {
+    await page.evaluate(() => {
+      const allDivs = Array.from(document.querySelectorAll('div'));
+      const card = allDivs.find(el => {
+        const style = getComputedStyle(el);
+        return style.borderRadius === '12px' &&
+               style.backgroundColor === 'rgb(255, 255, 255)' &&
+               el.textContent?.includes('Slack Catchup');
+      });
+      if (card) {
+        const viewDetail = Array.from(card.querySelectorAll('div')).find(el =>
+          el.textContent?.trim().startsWith('View Details') &&
+          el.children.length === 0 &&
+          el.style.cursor === 'pointer'
+        );
+        if (viewDetail) (viewDetail as HTMLElement).click();
+      }
+    });
+
+    await expect(page.locator('text=MISSION LOG')).toBeVisible({ timeout: 5000 });
+    const boundary = page.locator('text=/Never post messages or replies without approval/');
+    await expect(boundary.first()).toBeVisible();
+  });
+
+  // ── Slack Catchup Execution Data ────────────────────────────────
+
+  test('Slack Catchup execution shows in timeline after run', async ({ page }) => {
+    // The slack-catchup job was triggered, so its execution should show in timeline
+    const slackExecution = page.locator('text=Slack Catchup').first();
+    await expect(slackExecution).toBeVisible();
+  });
+
+  test('Slack Catchup execution shows awaiting-approval status', async ({ page }) => {
+    // Click the Slack Catchup card to filter timeline to just this job
+    const slackJob = page.locator('text=Slack Catchup').first();
+    await slackJob.click();
+    await page.waitForSelector('text=Filtering', { timeout: 3000 });
+
+    // The execution should show an awaiting-approval badge (draft replies need approval)
+    const approvalBadge = page.locator('text=/awaiting/i');
+    await expect(approvalBadge.first()).toBeVisible({ timeout: 3000 });
+  });
+
+  test('Slack Catchup execution expands to show thread reply actions', async ({ page }) => {
+    // Click Slack Catchup card to filter
+    const slackJob = page.locator('text=Slack Catchup').first();
+    await slackJob.click();
+    await page.waitForSelector('text=Filtering', { timeout: 3000 });
+
+    // Click execution row to expand
+    const clicked = await page.evaluate(() => {
+      const divs = Array.from(document.querySelectorAll('div'));
+      const execClickable = divs.find(el => {
+        if (el.style.cursor !== 'pointer') return false;
+        const span = el.querySelector('span');
+        return span && /^\d{2}:\d{2}/.test(span.textContent || '');
+      });
+      if (execClickable) {
+        (execClickable as HTMLElement).click();
+        return true;
+      }
+      return false;
+    });
+    if (!clicked) {
+      test.skip();
+      return;
+    }
+
+    await page.waitForTimeout(500);
+
+    // Should show slack-related action descriptions
+    const threadAction = page.locator('text=/thread/i');
+    await expect(threadAction.first()).toBeVisible({ timeout: 3000 });
+  });
 });

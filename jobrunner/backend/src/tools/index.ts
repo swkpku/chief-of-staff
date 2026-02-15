@@ -5,6 +5,7 @@
 
 import { gmailFunctions, gmailToolDefinitions } from "./mock-gmail.js";
 import { githubFunctions, githubToolDefinitions } from "./mock-github.js";
+import { slackFunctions, slackToolDefinitions } from "./mock-slack.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -48,6 +49,10 @@ const toolRegistry: Record<
   github: {
     definitions: githubToolDefinitions as ToolDefinition[],
     functions: githubFunctions,
+  },
+  slack: {
+    definitions: slackToolDefinitions as ToolDefinition[],
+    functions: slackFunctions,
   },
 };
 

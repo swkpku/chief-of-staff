@@ -57,7 +57,7 @@ router.get("/jobs", (_req: Request, res: Response) => {
  */
 router.get("/jobs/:id", (req: Request, res: Response) => {
   try {
-    const job = getJob(req.params.id);
+    const job = getJob(param(req, "id"));
     if (!job) {
       res.status(404).json({ error: "Job not found" });
       return;
@@ -87,13 +87,13 @@ router.get("/jobs/:id", (req: Request, res: Response) => {
  */
 router.post("/jobs/:id/run", async (req: Request, res: Response) => {
   try {
-    const job = getJob(req.params.id);
+    const job = getJob(param(req, "id"));
     if (!job) {
       res.status(404).json({ error: "Job not found" });
       return;
     }
 
-    const result = await triggerJob(req.params.id);
+    const result = await triggerJob(param(req, "id"));
     if (result.success) {
       res.json({
         message: `Job "${job.title}" triggered successfully`,
@@ -114,7 +114,7 @@ router.post("/jobs/:id/run", async (req: Request, res: Response) => {
  */
 router.post("/jobs/:id/toggle", (req: Request, res: Response) => {
   try {
-    const updated = toggleJob(req.params.id);
+    const updated = toggleJob(param(req, "id"));
     if (!updated) {
       res.status(404).json({ error: "Job not found" });
       return;
@@ -185,7 +185,7 @@ router.get("/timeline", (req: Request, res: Response) => {
  */
 router.get("/executions/:id", (req: Request, res: Response) => {
   try {
-    const execution = getExecution(req.params.id);
+    const execution = getExecution(param(req, "id"));
     if (!execution) {
       res.status(404).json({ error: "Execution not found" });
       return;
@@ -237,7 +237,7 @@ router.get("/approvals", (_req: Request, res: Response) => {
  */
 router.post("/actions/:id/approve", (req: Request, res: Response) => {
   try {
-    const result = approveAction(req.params.id);
+    const result = approveAction(param(req, "id"));
     if (result.success) {
       res.json(result);
     } else {
@@ -258,7 +258,7 @@ router.post("/actions/:id/approve", (req: Request, res: Response) => {
 router.post("/actions/:id/veto", (req: Request, res: Response) => {
   try {
     const reason = req.body?.reason as string | undefined;
-    const result = vetoAction(req.params.id, reason);
+    const result = vetoAction(param(req, "id"), reason);
     if (result.success) {
       res.json(result);
     } else {
@@ -278,6 +278,11 @@ router.post("/actions/:id/veto", (req: Request, res: Response) => {
 /**
  * Safely parse a JSON string, returning null if it fails.
  */
+function param(req: Request, name: string): string {
+  const v = req.params[name];
+  return Array.isArray(v) ? v[0] : v;
+}
+
 function safeParseJSON(value: string | null): unknown {
   if (!value) return null;
   try {

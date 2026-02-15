@@ -59,6 +59,14 @@ function checkBoundaryViolation(
       return `Boundary: ${boundary}`;
     }
 
+    // Check for "never post" + slack message/reply tools
+    if (
+      boundaryLower.includes("never post") &&
+      (toolLower.includes("draft_message") || toolLower.includes("draft_thread_reply"))
+    ) {
+      return `Boundary: ${boundary}`;
+    }
+
     // Check for "never approve" / "without approval" + approval tools
     if (
       (boundaryLower.includes("never approve") || boundaryLower.includes("without approval")) &&
@@ -495,12 +503,128 @@ async function executeInDemoMode(
     }
   }
 
+  if (job.tools.includes("slack")) {
+    // Simulate Slack catchup: read channels, find threads needing reply, draft replies
+
+    // 1. Summarize unread
+    const unreadResult = executeTool("slack_summarize_unread", {});
+    createAction({
+      id: uuidv4(),
+      execution_id: executionId,
+      description: "Summarized unread Slack activity",
+      tool: "slack_summarize_unread",
+      status: "executed",
+      result: JSON.stringify(unreadResult.data),
+      created_at: new Date().toISOString(),
+    });
+    actionsCount++;
+
+    // 2. Read mentions
+    const mentionsResult = executeTool("slack_read_mentions", {});
+    createAction({
+      id: uuidv4(),
+      execution_id: executionId,
+      description: "Checked @mentions",
+      tool: "slack_read_mentions",
+      status: "executed",
+      result: JSON.stringify(mentionsResult.data),
+      created_at: new Date().toISOString(),
+    });
+    actionsCount++;
+
+    // 3. Read DMs
+    const dmsResult = executeTool("slack_read_dms", {});
+    createAction({
+      id: uuidv4(),
+      execution_id: executionId,
+      description: "Checked direct messages",
+      tool: "slack_read_dms",
+      status: "executed",
+      result: JSON.stringify(dmsResult.data),
+      created_at: new Date().toISOString(),
+    });
+    actionsCount++;
+
+    // 4. Get threads needing reply
+    const threadsResult = executeTool("slack_get_threads_needing_reply", {});
+    createAction({
+      id: uuidv4(),
+      execution_id: executionId,
+      description: "Found 3 threads needing your reply",
+      tool: "slack_get_threads_needing_reply",
+      status: "executed",
+      result: JSON.stringify(threadsResult.data),
+      created_at: new Date().toISOString(),
+    });
+    actionsCount++;
+
+    // 5. Read each actionable thread and draft replies
+    const threadReplies = [
+      {
+        thread_ts: "1707900000.000100",
+        channel: "#engineering",
+        subject: "PR #158 — payment queue race condition fix",
+        reply: "Good question. I'd go with exponential backoff — start at 100ms, cap at 5s. Fixed intervals can cause thundering herd if multiple consumers retry at the same time. Happy to review the PR once that's added.",
+      },
+      {
+        thread_ts: "1707890000.000200",
+        channel: "#engineering",
+        subject: "CI pipeline config change",
+        reply: "Thanks for the heads-up Sarah. I'll rebase this morning — my branch shouldn't have any node version–specific deps so it should be smooth.",
+      },
+      {
+        thread_ts: "1707880000.000300",
+        channel: "#incidents",
+        subject: "Checkout error rate spike",
+        reply: "On it — I'll prioritize reviewing #158 right now. Mike, if the fix is scoped to the connection pool race, let's get it merged and deployed to staging ASAP.",
+      },
+    ];
+
+    for (const item of threadReplies) {
+      // Read the thread
+      const threadResult = executeTool("slack_read_thread", { thread_ts: item.thread_ts });
+      createAction({
+        id: uuidv4(),
+        execution_id: executionId,
+        description: `Read thread: ${item.subject}`,
+        tool: "slack_read_thread",
+        status: "executed",
+        result: JSON.stringify(threadResult.data),
+        created_at: new Date().toISOString(),
+      });
+      actionsCount++;
+
+      // Draft a reply (needs approval — boundary says never post without approval)
+      const draftResult = executeTool("slack_draft_thread_reply", {
+        channel: item.channel,
+        thread_ts: item.thread_ts,
+        text: item.reply,
+      });
+      createAction({
+        id: uuidv4(),
+        execution_id: executionId,
+        description: `Draft reply in ${item.channel} thread "${item.subject}": "${item.reply}"`,
+        tool: "slack_draft_thread_reply",
+        status: "pending-approval",
+        boundary_violation: "Boundary: Never post messages or replies without approval",
+        result: JSON.stringify(draftResult.data),
+        created_at: new Date().toISOString(),
+      });
+      actionsCount++;
+      pendingApprovals++;
+    }
+  }
+
   // Build summary
   const status = pendingApprovals > 0 ? "awaiting-approval" : "completed";
-  const summary =
-    job.tools.includes("gmail")
-      ? `Processed inbox: archived ${3} marketing emails, starred ${3} important, flagged ${3} suspicious.${pendingApprovals > 0 ? ` ${pendingApprovals} action(s) awaiting approval.` : ""}`
-      : `Reviewed ${4} open PRs. Commented on 2, found a bug in PR #142.${pendingApprovals > 0 ? ` ${pendingApprovals} action(s) awaiting approval.` : ""}`;
+  let summary: string;
+  if (job.tools.includes("gmail")) {
+    summary = `Processed inbox: archived ${3} marketing emails, starred ${3} important, flagged ${3} suspicious.${pendingApprovals > 0 ? ` ${pendingApprovals} action(s) awaiting approval.` : ""}`;
+  } else if (job.tools.includes("slack")) {
+    summary = `Slack catchup: 2 @mentions, 1 DM, 3 threads need your reply. Drafted 3 thread replies for your approval.`;
+  } else {
+    summary = `Reviewed ${4} open PRs. Commented on 2, found a bug in PR #142.${pendingApprovals > 0 ? ` ${pendingApprovals} action(s) awaiting approval.` : ""}`;
+  }
 
   updateExecution(executionId, {
     completed_at: new Date().toISOString(),
