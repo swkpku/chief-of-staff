@@ -314,8 +314,15 @@ router.get("/knowledge/:subject", (req: Request, res: Response) => {
 
 router.get("/priorities", (_req: Request, res: Response) => {
   try {
+    const config = getConfig();
+    const domainMeta = Object.fromEntries(config.domains.map(d => [d.id, { label: d.label, color: d.color }]));
     const result = runScoring();
-    res.json(result);
+    const priorities = result.top5.map(i => ({
+      ...i,
+      domain_label: domainMeta[i.domain]?.label || i.domain,
+      domain_color: domainMeta[i.domain]?.color || "#888",
+    }));
+    res.json({ priorities });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
@@ -337,22 +344,62 @@ router.get("/domain-health", (_req: Request, res: Response) => {
 router.get("/briefing/today", (_req: Request, res: Response) => {
   try {
     const db = getDb();
+    const config = getConfig();
+    const domainMeta = Object.fromEntries(config.domains.map(d => [d.id, { label: d.label, color: d.color }]));
     const today = new Date().toISOString().split("T")[0];
-    const snapshot = db.prepare("SELECT * FROM daily_snapshots WHERE date = ?").get(today);
+    const snapshot = db.prepare("SELECT * FROM daily_snapshots WHERE date = ?").get(today) as Record<string, unknown> | undefined;
+
+    // Helper: parse stored JSON strings and enrich domain_health with labels/colors
+    const enrichBriefing = (raw: Record<string, unknown>) => {
+      let domainHealth: unknown[] = [];
+      try {
+        const parsed = typeof raw.domain_health === "string" ? JSON.parse(raw.domain_health) : raw.domain_health;
+        if (Array.isArray(parsed)) {
+          domainHealth = parsed;
+        } else if (parsed && typeof parsed === "object") {
+          domainHealth = Object.entries(parsed as Record<string, number>).map(([domain, score]) => ({
+            domain,
+            label: domainMeta[domain]?.label || domain,
+            color: domainMeta[domain]?.color || "#888",
+            score,
+          }));
+        }
+      } catch { /* leave empty */ }
+
+      let topFive: unknown = raw.top_five;
+      try {
+        if (typeof topFive === "string") topFive = JSON.parse(topFive);
+      } catch { /* leave as-is */ }
+
+      return {
+        ...raw,
+        domain_health: domainHealth,
+        top_five: topFive,
+        text: raw.summary || null,
+        hyper_focus_alert: null,
+      };
+    };
 
     if (snapshot) {
-      res.json({ briefing: snapshot });
+      res.json({ briefing: enrichBriefing(snapshot) });
     } else {
-      // Generate on the fly
       const result = runScoring();
+      const domainHealthArr = result.domainHealth.map(d => ({
+        domain: d.domain,
+        label: domainMeta[d.domain]?.label || d.domain,
+        color: domainMeta[d.domain]?.color || "#888",
+        score: d.score,
+      }));
       res.json({
         briefing: {
           date: today,
-          top_five: JSON.stringify(result.top5.map(i => ({ id: i.id, title: i.title, domain: i.domain, score: i.composite_score, reason: i.rank_reason }))),
-          domain_health: JSON.stringify(Object.fromEntries(result.domainHealth.map(d => [d.domain, d.score]))),
-          summary: null,
+          top_five: result.top5.map(i => ({ id: i.id, title: i.title, domain: i.domain, score: i.composite_score, reason: i.rank_reason })),
+          domain_health: domainHealthArr,
+          text: null,
+          hyper_focus_alert: result.hyperFocus.detected
+            ? `You've been focused heavily on ${result.hyperFocus.focused_domain} (${Math.round(result.hyperFocus.focused_percent)}%). Consider giving ${result.hyperFocus.neglected_domain} some attention.`
+            : null,
         },
-        hyper_focus: result.hyperFocus,
       });
     }
   } catch (err) {
