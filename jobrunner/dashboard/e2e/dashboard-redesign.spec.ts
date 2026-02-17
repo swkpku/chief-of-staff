@@ -3,6 +3,9 @@ import { test, expect } from '@playwright/test';
 test.describe('Dashboard Light Theme Redesign', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
+    // Navigate to the AGENTS tab (default view is now briefing)
+    await page.waitForSelector('text=AGENTS', { timeout: 10000 });
+    await page.click('text=AGENTS');
     // Wait for data to load (jobs should appear)
     await page.waitForSelector('text=Jobs', { timeout: 10000 });
   });

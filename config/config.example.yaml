@@ -1,0 +1,64 @@
+# Copy this to config.yaml and fill in your values.
+# NEVER commit config.yaml — it contains your API keys and personal settings.
+
+# LLM Provider
+llm:
+  provider: anthropic          # anthropic | openai | ollama
+  model: claude-sonnet-4-20250514
+  api_key: YOUR_ANTHROPIC_API_KEY_HERE
+  # For local LLM (Phase 2):
+  # provider: ollama
+  # base_url: http://localhost:11434/v1
+  # model: llama3.1:8b
+
+# Connectors
+gmail:
+  enabled: false
+  client_id: YOUR_GOOGLE_CLIENT_ID
+  client_secret: YOUR_GOOGLE_CLIENT_SECRET
+  # tokens are stored in data/tokens/gmail.json (auto-generated after OAuth)
+
+x_bookmarks:
+  enabled: false
+  api_key: YOUR_X_API_KEY
+  api_secret: YOUR_X_API_SECRET
+  access_token: YOUR_X_ACCESS_TOKEN
+
+# Schedule
+schedule:
+  timezone: America/Los_Angeles
+  wake_time: "07:00"
+  sleep_time: "22:00"
+  briefing_time: "07:00"
+  weekly_review_day: sunday
+  weekly_review_time: "18:00"
+
+# Scoring weights (tune to your preferences)
+scoring:
+  deadline_weight: 3.0
+  consequence_weight: 2.5
+  effort_weight: 0.5
+  domain_neglect_weight: 2.0
+  staleness_weight: 1.0
+  max_same_domain_in_top5: 3
+  hyper_focus_threshold_percent: 80
+  hyper_focus_lookback_days: 3
+  anomaly_deviation_threshold: 0.3    # 30% above rolling average
+
+# Domains — users can rename or add domains
+domains:
+  - id: email
+    label: "Email"
+    color: "#3B82F6"
+  - id: projects
+    label: "Projects"
+    color: "#8B5CF6"
+  - id: household
+    label: "Household"
+    color: "#F59E0B"
+  - id: career
+    label: "Career"
+    color: "#10B981"
+  - id: kids
+    label: "Kids"
+    color: "#EF4444"

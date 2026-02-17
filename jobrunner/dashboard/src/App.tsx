@@ -1,5 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Layout from './components/Layout';
+import BriefingView from './components/BriefingView';
+import QuickCapture from './components/QuickCapture';
+import DomainView from './components/DomainView';
+import KnowledgeLog from './components/KnowledgeLog';
+import WeeklyReview from './components/WeeklyReview';
+import SettingsView from './components/SettingsView';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -257,8 +263,9 @@ export default function App() {
   const [approvals, setApprovals] = useState<Action[]>([]);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [selectedExecution, setSelectedExecution] = useState<string | null>(null);
-  const [view, setView] = useState<'timeline' | 'job-detail'>('timeline');
+  const [view, setView] = useState<'briefing' | 'timeline' | 'job-detail' | 'domain' | 'knowledge' | 'weekly-review' | 'settings'>('briefing');
   const [selectedJobDetail, setSelectedJobDetail] = useState<string | null>(null);
+  const [selectedDomain, setSelectedDomain] = useState<{ id: string; label: string; color: string } | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
@@ -288,6 +295,17 @@ export default function App() {
     setSelectedJobId(jobId);
     setView('timeline');
     setSelectedExecution(null);
+  }, []);
+
+  const handleNavigate = useCallback((target: typeof view) => {
+    setView(target);
+    setSelectedJobDetail(null);
+    setSelectedDomain(null);
+  }, []);
+
+  const handleShowDomain = useCallback((domain: { id: string; label: string; color: string }) => {
+    setSelectedDomain(domain);
+    setView('domain');
   }, []);
 
   const handleShowJobDetail = useCallback((jobId: string) => {
@@ -389,27 +407,120 @@ export default function App() {
     }
   }, [selectedExecution]);
 
+  const renderView = () => {
+    switch (view) {
+      case 'briefing':
+        return <BriefingView onShowDomain={handleShowDomain} />;
+      case 'domain':
+        return selectedDomain ? (
+          <DomainView
+            domain={selectedDomain.id}
+            domainLabel={selectedDomain.label}
+            domainColor={selectedDomain.color}
+            onBack={() => handleNavigate('briefing')}
+          />
+        ) : null;
+      case 'knowledge':
+        return <KnowledgeLog />;
+      case 'weekly-review':
+        return <WeeklyReview />;
+      case 'settings':
+        return <SettingsView />;
+      default:
+        return null;
+    }
+  };
+
   return (
     <>
       <style>{globalStyles}</style>
-      <Layout
-        jobs={jobs}
-        timeline={timeline}
-        approvals={approvals}
-        selectedJobId={selectedJobId}
-        selectedExecution={selectedExecution}
-        view={view}
-        selectedJobDetail={selectedJobDetail}
-        loading={loading}
-        onSelectJob={handleSelectJob}
-        onShowJobDetail={handleShowJobDetail}
-        onBackToTimeline={handleBackToTimeline}
-        onApprove={handleApprove}
-        onVeto={handleVeto}
-        onRunNow={handleRunNow}
-        onToggleJob={handleToggleJob}
-        onSelectExecution={handleSelectExecution}
-      />
+      <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+        {/* ── Top Nav Bar ─── */}
+        <div style={{
+          position: 'sticky', top: 0, zIndex: 100,
+          background: 'var(--shelf)', borderBottom: '1px solid var(--ridge)',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+          padding: '14px 32px', display: 'flex', alignItems: 'center', gap: 24,
+        }}>
+          <div className="serif" style={{ fontSize: 20, letterSpacing: '0.08em', color: 'var(--snow)', lineHeight: 1, cursor: 'pointer' }}
+               onClick={() => handleNavigate('briefing')}>
+            JOBRUNNER
+          </div>
+          <div style={{ width: 1, height: 24, background: 'var(--ridge)' }} />
+
+          {/* Nav tabs */}
+          {[
+            { key: 'briefing' as const, label: 'HOME' },
+            { key: 'timeline' as const, label: 'AGENTS' },
+            { key: 'knowledge' as const, label: 'KNOWLEDGE' },
+            { key: 'weekly-review' as const, label: 'REVIEW' },
+            { key: 'settings' as const, label: 'SETTINGS' },
+          ].map(tab => (
+            <button key={tab.key} className="mono" onClick={() => handleNavigate(tab.key)}
+              style={{
+                fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase' as const,
+                color: view === tab.key ? 'var(--radar)' : 'var(--ghost)',
+                borderBottom: view === tab.key ? '2px solid var(--radar)' : '2px solid transparent',
+                paddingBottom: 2, background: 'transparent',
+              }}>
+              {tab.label}
+            </button>
+          ))}
+
+          <div style={{ flex: 1 }} />
+
+          {/* Pending approvals indicator */}
+          {approvals.filter(a => a.status === 'pending-approval').length > 0 && (
+            <div className="mono" style={{
+              fontSize: 12, letterSpacing: '0.1em', color: 'var(--alert)',
+              textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 8,
+            }}>
+              <span className="status-dot-awaiting" style={{
+                display: 'inline-block', width: 6, height: 6, borderRadius: '50%',
+                background: 'var(--alert)', flexShrink: 0,
+              }} />
+              <span>{approvals.filter(a => a.status === 'pending-approval').length} AWAITING</span>
+            </div>
+          )}
+        </div>
+
+        {/* ── Quick Capture Bar ─── */}
+        <QuickCapture />
+
+        {/* ── Main Content ─── */}
+        <div style={{ flex: 1, overflowY: 'auto', background: 'var(--void)' }}>
+          {loading ? (
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              height: '60vh', flexDirection: 'column', gap: 12,
+            }}>
+              <span className="mono" style={{
+                fontSize: 14, letterSpacing: '0.12em', color: 'var(--ghost)',
+                textTransform: 'uppercase', animation: 'pulse 2s ease-in-out infinite',
+              }}>Loading...</span>
+            </div>
+          ) : (view === 'timeline' || view === 'job-detail') ? (
+            <Layout
+              jobs={jobs}
+              timeline={timeline}
+              approvals={approvals}
+              selectedJobId={selectedJobId}
+              selectedExecution={selectedExecution}
+              view={view === 'job-detail' ? 'job-detail' : 'timeline'}
+              selectedJobDetail={selectedJobDetail}
+              loading={false}
+              onSelectJob={handleSelectJob}
+              onShowJobDetail={handleShowJobDetail}
+              onBackToTimeline={handleBackToTimeline}
+              onApprove={handleApprove}
+              onVeto={handleVeto}
+              onRunNow={handleRunNow}
+              onToggleJob={handleToggleJob}
+              onSelectExecution={handleSelectExecution}
+            />
+          ) : renderView()}
+        </div>
+      </div>
     </>
   );
 }

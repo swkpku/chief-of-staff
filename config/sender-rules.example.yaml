@@ -1,0 +1,22 @@
+# Map email sender domains to life domains.
+# Copy to sender-rules.yaml and customize.
+
+# School-related
+"*.edu": kids
+"schooldistrict.org": kids
+"classdojo.com": kids
+"remind.com": kids
+
+# Work
+"yourcompany.com": career
+
+# Bills & services
+"xfinity.com": household
+"pgande.com": household
+"geico.com": household
+
+# Code
+"github.com": projects
+"gitlab.com": projects
+
+# Default (unmatched senders): email

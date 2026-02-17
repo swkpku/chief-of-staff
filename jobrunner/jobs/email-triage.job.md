@@ -1,7 +1,7 @@
 # Email Triage
 
 ## Schedule
-0 6 * * *
+*/30 8-22 * * *
 
 ## Goal
 Check my recent emails. Archive marketing/spam. Star important ones.

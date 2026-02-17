@@ -24,6 +24,10 @@ import { initDb, upsertJob } from "./db.js";
 import { parseAllJobs, watchJobs, type JobDefinition } from "./parser.js";
 import { initScheduler, updateJobs } from "./scheduler.js";
 import apiRouter from "./api.js";
+import lifeApiRouter from "./api-life.js";
+import { loadConfig, isDemoMode } from "./config/loader.js";
+import { runMigrations } from "./db/migrate.js";
+import { seed } from "./db/seeds/seed.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -46,9 +50,22 @@ async function main(): Promise<void> {
   console.log("=".repeat(60));
   console.log();
 
+  // 0. Load config
+  console.log("[startup] Loading configuration...");
+  const config = loadConfig();
+  console.log(`[startup] Mode: ${isDemoMode() ? "DEMO" : "LIVE"}`);
+
   // 1. Initialize database
   console.log("[startup] Initializing database...");
   initDb();
+
+  // 1b. Run migrations
+  console.log("[startup] Running migrations...");
+  runMigrations();
+
+  // 1c. Seed data
+  console.log("[startup] Seeding data...");
+  seed();
   console.log("[startup] Database ready");
 
   // 2. Parse job.md files
@@ -77,13 +94,14 @@ async function main(): Promise<void> {
 
   // 5. Mount API routes
   app.use("/api", apiRouter);
+  app.use("/api", lifeApiRouter);
 
   // Health check endpoint
   app.get("/health", (_req, res) => {
     res.json({
       status: "ok",
       timestamp: new Date().toISOString(),
-      demo_mode: !process.env.ANTHROPIC_API_KEY,
+      demo_mode: isDemoMode(),
     });
   });
 
